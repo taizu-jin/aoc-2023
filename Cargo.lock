@@ -3,5 +3,12 @@
 version = 3
 
 [[package]]
+name = "aoc-2023"
+version = "0.0.0"
+dependencies = [
+ "day-1",
+]
+
+[[package]]
 name = "day-1"
 version = "0.0.0"
