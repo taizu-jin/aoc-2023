@@ -15,3 +15,4 @@ edition.workspace = true
 
 [dependencies]
 day-1 = {path = "crates/day-1"}
+day-2 = {path = "crates/day-2"}
