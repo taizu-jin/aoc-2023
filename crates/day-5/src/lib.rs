@@ -1,10 +1,38 @@
-#[derive(Debug)]
-struct Range {
-    destination: std::ops::Range<u64>,
-    source: std::ops::Range<u64>,
+use std::marker::PhantomData;
+
+trait FromStrToVec
+where
+    Self: Sized,
+{
+    fn to_vec(source: &str) -> Vec<Self>;
 }
 
-impl Range {
+struct SingleSeed(u64);
+
+impl From<&str> for SingleSeed {
+    fn from(value: &str) -> Self {
+        Self(value.parse().expect("parse single seed to number"))
+    }
+}
+
+impl FromStrToVec for SingleSeed {
+    fn to_vec(value: &str) -> Vec<Self> {
+        let mut vec = Vec::new();
+        for line in value.split_whitespace() {
+            vec.push(Self::from(line));
+        }
+        vec
+    }
+}
+
+#[derive(Debug)]
+struct Range<T> {
+    destination: std::ops::Range<u64>,
+    source: std::ops::Range<u64>,
+    _marker: PhantomData<T>,
+}
+
+impl Range<SingleSeed> {
     fn destination(&self, source: u64) -> Option<u64> {
         if !self.source.contains(&source) {
             return None;
@@ -15,7 +43,7 @@ impl Range {
     }
 }
 
-impl From<&str> for Range {
+impl<T> From<&str> for Range<T> {
     fn from(value: &str) -> Self {
         let mut input = value.split_whitespace();
         let destination = input
@@ -47,14 +75,18 @@ impl From<&str> for Range {
         Self {
             destination,
             source,
+            _marker: PhantomData,
         }
     }
 }
 
 #[derive(Debug)]
-struct Map(Vec<Range>);
+struct Map<T> {
+    ranges: Vec<Range<T>>,
+    _marker: PhantomData<T>,
+}
 
-impl<'a, T> From<T> for Map
+impl<'a, T, K> From<T> for Map<K>
 where
     T: Iterator<Item = &'a str>,
 {
@@ -64,13 +96,16 @@ where
             ranges.push(line.into());
         }
 
-        Self(ranges)
+        Self {
+            ranges,
+            _marker: PhantomData,
+        }
     }
 }
 
-impl Map {
+impl Map<SingleSeed> {
     fn destination(&self, source: u64) -> u64 {
-        for range in &self.0 {
+        for range in &self.ranges {
             if let Some(destination) = range.destination(source) {
                 return destination;
             }
@@ -81,14 +116,15 @@ impl Map {
 }
 
 #[derive(Debug)]
-struct Almanac {
-    seeds: Vec<u64>,
-    maps: Vec<Map>,
+struct Almanac<T> {
+    seeds: Vec<T>,
+    maps: Vec<Map<T>>,
 }
 
-impl<'a, T> From<T> for Almanac
+impl<'a, T, K> From<T> for Almanac<K>
 where
     T: Iterator<Item = &'a str>,
+    K: FromStrToVec,
 {
     fn from(mut value: T) -> Self {
         let seeds_raw = value
@@ -96,13 +132,9 @@ where
             .expect("get seed line")
             .split_once(':')
             .expect("split seeds at ':'")
-            .1
-            .split_whitespace();
+            .1;
 
-        let mut seeds = Vec::new();
-        for seed in seeds_raw {
-            seeds.push(seed.parse().expect("parsed seed number"));
-        }
+        let seeds = K::to_vec(seeds_raw);
 
         let mut maps = Vec::new();
         for section in value {
@@ -115,12 +147,12 @@ where
     }
 }
 
-impl Almanac {
+impl Almanac<SingleSeed> {
     fn find_lowest_location(&self) -> u64 {
         let mut location = u64::MAX;
 
         for seed in &self.seeds {
-            let mut target = *seed;
+            let mut target = seed.0;
 
             for map in &self.maps {
                 target = map.destination(target);
@@ -136,7 +168,7 @@ impl Almanac {
 }
 
 pub fn solve_part_1(input: &str) -> u64 {
-    Almanac::from(input.split("\n\n")).find_lowest_location()
+    Almanac::<SingleSeed>::from(input.split("\n\n")).find_lowest_location()
 }
 
 #[cfg(test)]
