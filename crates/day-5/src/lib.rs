@@ -4,7 +4,7 @@ trait FromStrToVec
 where
     Self: Sized,
 {
-    fn to_vec(source: &str) -> Vec<Self>;
+    fn to_vec(value: &str) -> Vec<Self>;
 }
 
 struct SingleSeed(u64);
@@ -18,8 +18,27 @@ impl From<&str> for SingleSeed {
 impl FromStrToVec for SingleSeed {
     fn to_vec(value: &str) -> Vec<Self> {
         let mut vec = Vec::new();
-        for line in value.split_whitespace() {
-            vec.push(Self::from(line));
+        for seeds in value.split_whitespace() {
+            vec.push(Self::from(seeds));
+        }
+        vec
+    }
+}
+
+struct SeedRange(std::ops::Range<u64>);
+
+impl FromStrToVec for SeedRange {
+    fn to_vec(value: &str) -> Vec<Self> {
+        let mut vec = Vec::new();
+        for chunk in value.split_whitespace().collect::<Vec<&str>>().chunks(2) {
+            let start = chunk[0].parse().expect("parse seed start to number");
+            let length = chunk[1]
+                .parse::<u64>()
+                .expect("parse seed length to number");
+            vec.push(Self(std::ops::Range {
+                start,
+                end: start + length,
+            }))
         }
         vec
     }
@@ -40,6 +59,48 @@ impl Range<SingleSeed> {
 
         let offset = source - self.source.start;
         Some(self.destination.start + offset)
+    }
+}
+
+impl Range<SeedRange> {
+    /// Returns destination range if found and ranges that did not fit.
+    fn destination(
+        &self,
+        source: std::ops::Range<u64>,
+    ) -> (Option<std::ops::Range<u64>>, Vec<std::ops::Range<u64>>) {
+        if !self.source.contains(&source.start) && !self.source.contains(&(source.end)) {
+            return (None, vec![source]);
+        }
+
+        let mut leftovers = Vec::new();
+
+        let mut offest = 0;
+        if source.start < self.source.start {
+            leftovers.push(std::ops::Range {
+                start: source.start,
+                end: self.source.start,
+            })
+        } else {
+            offest = source.start - self.source.start;
+        }
+
+        let length = if source.end > self.source.end {
+            leftovers.push(std::ops::Range {
+                start: self.source.end,
+                end: source.end,
+            });
+            self.source.end - self.source.start - offest
+        } else {
+            source.end - self.source.start - offest
+        };
+
+        (
+            Some(std::ops::Range {
+                start: self.destination.start + offest,
+                end: self.destination.start + offest + length,
+            }),
+            leftovers,
+        )
     }
 }
 
@@ -115,6 +176,33 @@ impl Map<SingleSeed> {
     }
 }
 
+impl Map<SeedRange> {
+    fn destinations(&self, source: std::ops::Range<u64>) -> Vec<std::ops::Range<u64>> {
+        let mut sources = vec![source];
+        let mut destinations = Vec::new();
+
+        for range in &self.ranges {
+            let mut leftovers = Vec::new();
+
+            while let Some(source) = sources.pop() {
+                {
+                    let (dest, mut lo) = range.destination(source);
+                    leftovers.append(&mut lo);
+
+                    if let Some(dest) = dest {
+                        destinations.push(dest);
+                    }
+                }
+            }
+
+            sources.append(&mut leftovers);
+        }
+
+        destinations.append(&mut sources);
+        destinations
+    }
+}
+
 #[derive(Debug)]
 struct Almanac<T> {
     seeds: Vec<T>,
@@ -167,8 +255,40 @@ impl Almanac<SingleSeed> {
     }
 }
 
+impl Almanac<SeedRange> {
+    fn find_lowest_location(self) -> u64 {
+        let mut location = u64::MAX;
+
+        for range in self.seeds {
+            let mut ranges = vec![range.0];
+
+            for map in &self.maps {
+                let mut destinations = Vec::new();
+
+                while let Some(range) = ranges.pop() {
+                    destinations.append(&mut map.destinations(range));
+                }
+
+                ranges.append(&mut destinations);
+            }
+
+            if let Some(lowest_range) = ranges.iter().min_by(|l, r| l.start.cmp(&r.start)) {
+                if lowest_range.start < location {
+                    location = lowest_range.start
+                }
+            }
+        }
+
+        location
+    }
+}
+
 pub fn solve_part_1(input: &str) -> u64 {
     Almanac::<SingleSeed>::from(input.split("\n\n")).find_lowest_location()
+}
+
+pub fn solve_part_2(input: &str) -> u64 {
+    Almanac::<SeedRange>::from(input.split("\n\n")).find_lowest_location()
 }
 
 #[cfg(test)]
@@ -178,6 +298,11 @@ mod tests {
     #[test]
     fn part_1() {
         assert_eq!(solve_part_1(input()), 35);
+    }
+
+    #[test]
+    fn part_2() {
+        assert_eq!(solve_part_2(input()), 46);
     }
 
     fn input() -> &'static str {

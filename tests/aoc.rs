@@ -71,3 +71,11 @@ fn day_5_part_1() {
 
     assert_eq!(result, 157211394);
 }
+
+#[test]
+fn day_5_part_2() {
+    let input = read_to_string("input/day-5").expect("file present");
+    let result = day_5::solve_part_2(&input);
+
+    assert_eq!(result, 50855035);
+}
