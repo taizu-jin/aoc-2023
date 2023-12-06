@@ -19,3 +19,4 @@ day-2 = {path = "crates/day-2"}
 day-3 = {path = "crates/day-3"}
 day-4 = {path = "crates/day-4"}
 day-5 = {path = "crates/day-5"}
+day-6 = {path = "crates/day-6"}
