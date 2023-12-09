@@ -21,6 +21,10 @@ impl From<&str> for Sequence {
 }
 
 impl Sequence {
+    fn rev(&mut self) {
+        self.seq.reverse()
+    }
+
     fn next(&mut self) -> i32 {
         let mut result = 0;
         let mut j = 0;
@@ -76,7 +80,16 @@ pub fn solve_part_1(input: &str) -> i32 {
     result
 }
 
+pub fn solve_part_2(input: &str) -> i32 {
+    let mut result = 0;
+    for line in input.lines() {
+        let mut seq = Sequence::from(line);
+        seq.rev();
+        result += seq.next();
+    }
 
+    result
+}
 
 #[cfg(test)]
 mod tests {
@@ -85,6 +98,11 @@ mod tests {
     #[test]
     fn part_1() {
         assert_eq!(solve_part_1(input()), 114);
+    }
+
+    #[test]
+    fn part_2() {
+        assert_eq!(solve_part_2(input()), 2);
     }
 
     #[test]
