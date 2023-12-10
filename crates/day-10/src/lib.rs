@@ -387,6 +387,35 @@ impl Maze {
             }
         }
     }
+
+    fn fill_loop(&mut self) {
+        let pipe = self
+            .pipes
+            .iter()
+            .find(|p| p.is_loop() && p.has_start)
+            .unwrap();
+        let pipe = pipe.parts.iter().map(|p| (p.x, p.y)).collect::<Vec<_>>();
+
+        let mut is_crossed = false;
+
+        for y in 0..self.height {
+            for x in 0..self.width {
+                if pipe.contains(&(x as i32, y as i32)) {
+                    let tile = PartKind::try_from(&self.maze[x + y * self.width]).unwrap();
+                    match tile {
+                        PartKind::NS | PartKind::SW | PartKind::SE | PartKind::Start => {
+                            is_crossed = !is_crossed
+                        }
+                        _ => (),
+                    }
+                } else if is_crossed {
+                    self.maze[x + y * self.width] = 'I';
+                } else {
+                    self.maze[x + y * self.width] = 'O';
+                }
+            }
+        }
+    }
 }
 
 impl From<&str> for Maze {
@@ -429,14 +458,15 @@ impl Display for Maze {
 
         for y in 0..self.height {
             for x in 0..self.width {
-                if pipe.contains(&(x as i32, y as i32)) {
-                    if self.maze[x + y * self.width] == 'S' {
-                        write!(f, "\x1B[31m{}\x1B[37m", self.maze[x + y * self.width])?;
-                    } else {
-                        write!(f, "\x1B[34m{}\x1B[37m", self.maze[x + y * self.width])?;
-                    }
-                } else {
-                    write!(f, "{}", self.maze[x + y * self.width])?;
+                let tile = self.maze[x + y * self.width];
+                let is_part_of_pipe = pipe.contains(&(x as i32, y as i32));
+
+                match (tile, is_part_of_pipe) {
+                    ('S', true) => write!(f, "\x1B[31m{}\x1B[37m", tile)?,
+                    ('I', _) => write!(f, "\x1B[32m{}\x1B[37m", tile)?,
+                    ('O', _) => write!(f, "\x1B[90m{}\x1B[37m", tile)?,
+                    (tile, true) => write!(f, "\x1B[34m{}\x1B[37m", tile)?,
+                    (_, _) => write!(f, "{}", tile)?,
                 }
             }
             writeln!(f)?;
@@ -448,13 +478,18 @@ impl Display for Maze {
 
 pub fn solve_part_1(input: &str) -> u32 {
     let maze = Maze::from(input);
-    println!("{}", maze);
     let pipe = maze
         .pipes
         .iter()
         .find(|p| p.is_loop() && p.has_start)
         .unwrap();
     (pipe.parts.len() / 2) as u32
+}
+
+pub fn solve_part_2(input: &str) -> u32 {
+    let mut maze = Maze::from(input);
+    maze.fill_loop();
+    maze.maze.iter().filter(|c| **c == 'I').count() as u32
 }
 
 #[cfg(test)]
@@ -513,5 +548,58 @@ SJ.L7
 |F--J
 LJ...";
         assert_eq!(solve_part_1(input), 8);
+    }
+
+    #[test]
+    fn part_2() {
+        let input = "...........
+.S-------7.
+.|F-----7|.
+.||.....||.
+.||.....||.
+.|L-7.F-J|.
+.|..|.|..|.
+.L--J.L--J.
+...........";
+
+        assert_eq!(solve_part_2(input), 4);
+
+        let input = "..........
+.S------7.
+.|F----7|.
+.||....||.
+.||....||.
+.|L-7F-J|.
+.|..||..|.
+.L--JL--J.
+..........";
+
+        assert_eq!(solve_part_2(input), 4);
+
+        let input = ".F----7F7F7F7F-7....
+.|F--7||||||||FJ....
+.||.FJ||||||||L7....
+FJL7L7LJLJ||LJ.L-7..
+L--J.L7...LJS7F-7L7.
+....F-J..F7FJ|L7L7L7
+....L7.F7||L7|.L7L7|
+.....|FJLJ|FJ|F7|.LJ
+....FJL-7.||.||||...
+....L---J.LJ.LJLJ...";
+
+        assert_eq!(solve_part_2(input), 8);
+
+        let input = "FF7FSF7F7F7F7F7F---7
+L|LJ||||||||||||F--J
+FL-7LJLJ||||||LJL-77
+F--JF--7||LJLJ7F7FJ-
+L---JF-JLJ.||-FJLJJ7
+|F|F-JF---7F7-L7L|7|
+|FFJF7L7F-JF7|JL---7
+7-L-JL7||F7|L7F-7F7|
+L.L7LFJ|||||FJL7||LJ
+L7JLJL-JLJLJL--JLJ.L";
+
+        assert_eq!(solve_part_2(input), 10);
     }
 }
