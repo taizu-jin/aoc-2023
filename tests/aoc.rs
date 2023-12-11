@@ -165,5 +165,13 @@ fn day_11_part_1() {
     let input = read_to_string("input/day-11").expect("file present");
     let result = day_11::solve_part_1(&input);
 
-    assert_eq!(result, 0);
+    assert_eq!(result, 9177603);
+}
+
+#[test]
+fn day_11_part_2() {
+    let input = read_to_string("input/day-11").expect("file present");
+    let result = day_11::solve_part_2(&input);
+
+    assert_eq!(result, 632003913611);
 }
